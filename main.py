@@ -5,7 +5,7 @@ import sqlite3
 from datetime import datetime
 import time
 
-bot = telebot.TeleBot("7856074080:AAE9HoPWWVGGPlWiySZoKlMFVE5VPb5SvVU")
+bot = telebot.TeleBot("7856074080:AAGPBNStc9JixmgxaILGsPBxm2n3M88hhwU")
 user_language = {}
 
 # 📦 База данных
