@@ -1,3 +1,6 @@
+from webserver import keep_alive  # 👈 запускаем мини-сервер для Render
+keep_alive()
+
 import telebot
 from telebot import types
 import random
