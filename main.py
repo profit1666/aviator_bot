@@ -1,4 +1,4 @@
-from webserver import keep_alive  # 👈 запускаем мини-сервер для Render
+from webserver import keep_alive  # 👈 мини-сервер для Render
 keep_alive()
 
 import telebot
@@ -7,6 +7,10 @@ import random
 import sqlite3
 from datetime import datetime
 import time
+import sys
+
+# 🔒 Telegram ID админа (твой ID)
+ADMIN_ID = 7322849114
 
 bot = telebot.TeleBot("7856074080:AAGPBNStc9JixmgxaILGsPBxm2n3M88hhwU")
 user_language = {}
@@ -26,6 +30,13 @@ conn.commit()
 # 🔢 Генератор случайного сигнала
 def generate_signal():
     return round(random.uniform(1.2, 15.0), 2)
+
+# 📬 Уведомление об ошибке
+def notify_error(error_message):
+    try:
+        bot.send_message(ADMIN_ID, f"💥 Бот упал:\n<code>{error_message}</code>", parse_mode="HTML")
+    except:
+        print("❌ Не удалось отправить ошибку администратору")
 
 # 🔘 /start → выбор языка
 @bot.message_handler(commands=['start'])
@@ -92,5 +103,17 @@ def handle_buttons(message):
     else:
         bot.send_message(chat_id, "🤖 Unknown command." if lang == "en" else "🤖 कमांड समझ नहीं आया।")
 
-print("🚀 Бот запущен!")
-bot.polling(none_stop=True)
+# 🔁 Автоперезапуск + отправка ошибки
+def launch_bot():
+    while True:
+        try:
+            print("🚀 Бот запущен!")
+            bot.polling(none_stop=True)
+        except Exception as e:
+            error_text = str(e)
+            print(f"💥 Ошибка: {error_text}")
+            notify_error(error_text)
+            time.sleep(5)
+            print("🔁 Перезапуск бота...")
+
+launch_bot()
