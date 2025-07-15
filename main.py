@@ -22,11 +22,11 @@ def keep_alive():
 keep_alive()
 
 # 🔑 Настройки Telegram-бота
-TOKEN = "ВСТАВЬ_СВОЙ_ТОКЕН_ЗДЕСЬ"
-ADMIN_ID = ВСТАВЬ_СВОЙ_ID_ЗДЕСЬ  # Например: 1463957271
+TOKEN = "7856074080:AAGPBNStc9JixmgxaILGsPBxm2n3M88hhwU"
+ADMIN_ID = 1463957271
 bot = telebot.TeleBot(TOKEN)
 user_language = {}
-user_language[ADMIN_ID] = "ru"  # админ всегда на русском языке
+user_language[ADMIN_ID] = "ru"  # админ всегда использует русский
 # 📦 База данных SQLite
 conn = sqlite3.connect('leads.db', check_same_thread=False)
 with conn:
@@ -129,7 +129,7 @@ def show_language_menu(chat_id):
     )
     bot.send_message(chat_id, "Please choose a language:", reply_markup=markup)
 
-# 🌍 Обработка выбранного языка
+# 🌍 Выбор языка → запуск сигнала
 @bot.message_handler(func=lambda m: m.text in ["🇬🇧 English", "🇮🇳 हिंदी"])
 def set_language(message):
     user_id = message.chat.id
@@ -262,7 +262,7 @@ def handle_admin_view(call):
         text = "⏳ В ожидании:\n" + "\n".join([f"🔸 ID: {r[0]} | @{r[1]}" for r in rows]) if rows else "🙁 Нет заявок."
         bot.send_message(call.message.chat.id, text)
 
-# 🔁 Автовосстановление polling + уведомление
+# 🔁 Автовосстановление polling + уведомление админу
 def start_bot():
     while True:
         try:
