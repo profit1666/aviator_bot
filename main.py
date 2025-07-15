@@ -7,7 +7,7 @@ import random
 import time
 from datetime import datetime
 
-# 🌐 Flask-сервер для Render
+# 🌐 Flask для Render
 app = Flask('')
 @app.route('/')
 def home():
@@ -21,12 +21,12 @@ def keep_alive():
 
 keep_alive()
 
-# 🔑 Настройки Telegram-бота
+# 🔑 Настройки
 TOKEN = "7856074080:AAGPBNStc9JixmgxaILGsPBxm2n3M88hhwU"
 ADMIN_ID = 1463957271
 bot = telebot.TeleBot(TOKEN)
 user_language = {}
-user_language[ADMIN_ID] = "ru"  # админ всегда использует русский
+user_language[ADMIN_ID] = "ru"
 # 📦 База данных SQLite
 conn = sqlite3.connect('leads.db', check_same_thread=False)
 with conn:
@@ -47,8 +47,7 @@ with conn:
 # 🎯 Генератор сигнала Aviator
 def generate_signal():
     return round(random.uniform(1.2, 15.0), 2)
-
-# 🚀 Команда /start
+# 🚀 Обработка /start
 @bot.message_handler(commands=['start'])
 def start(message):
     user_id = message.chat.id
@@ -89,6 +88,8 @@ def start(message):
 
     bot.send_message(ADMIN_ID, info, parse_mode="HTML", reply_markup=markup)
     bot.send_message(user_id, "🔒 Ваша заявка отправлена. Ожидайте подтверждения.")
+
+# ✅ Обработка решения админа
 @bot.callback_query_handler(func=lambda call: call.data.startswith("approve_") or call.data.startswith("deny_"))
 def handle_access_decision(call):
     action, user_id = call.data.split("_")
@@ -128,8 +129,7 @@ def show_language_menu(chat_id):
         types.KeyboardButton("🇮🇳 हिंदी")
     )
     bot.send_message(chat_id, "Please choose a language:", reply_markup=markup)
-
-# 🌍 Выбор языка → запуск сигнала
+# 🌍 Обработка выбранного языка
 @bot.message_handler(func=lambda m: m.text in ["🇬🇧 English", "🇮🇳 हिंदी"])
 def set_language(message):
     user_id = message.chat.id
@@ -162,6 +162,7 @@ def set_language(message):
     }
     bot.send_message(user_id, msg[lang], parse_mode="HTML")
     show_main_menu(user_id, lang)
+
 # 📱 Главное меню
 def show_main_menu(chat_id, lang):
     buttons = {
@@ -174,7 +175,7 @@ def show_main_menu(chat_id, lang):
     markup.add(types.KeyboardButton(signal_btn), types.KeyboardButton(lang_btn))
     bot.send_message(chat_id, prompt, reply_markup=markup)
 
-# 🔘 Обработка кнопок
+# 🔘 Обработка кнопок меню
 @bot.message_handler(func=lambda m: True)
 def handle_buttons(message):
     user_id = message.chat.id
@@ -230,7 +231,7 @@ def handle_buttons(message):
 
     elif text == "/admin" and user_id == ADMIN_ID:
         show_admin_panel(user_id)
-# 🎛 Панель администратора
+# 🎛 Админ-панель
 def show_admin_panel(chat_id):
     if chat_id != ADMIN_ID:
         bot.send_message(chat_id, "🚫 У вас нет прав администратора.")
@@ -239,11 +240,12 @@ def show_admin_panel(chat_id):
     markup = types.InlineKeyboardMarkup(row_width=2)
     markup.add(
         types.InlineKeyboardButton("📍 Активные", callback_data="show_active"),
-        types.InlineKeyboardButton("⏳ Ожидающие", callback_data="show_pending")
+        types.InlineKeyboardButton("⏳ Ожидающие", callback_data="show_pending"),
+        types.InlineKeyboardButton("📊 Статистика", callback_data="show_stats")
     )
-    bot.send_message(chat_id, "🎛 Панель администратора:", reply_markup=markup)
+    bot.send_message(chat_id, "🎛 Панель управления:", reply_markup=markup)
 
-@bot.callback_query_handler(func=lambda call: call.data in ["show_active", "show_pending"])
+@bot.callback_query_handler(func=lambda call: call.data.startswith("show_"))
 def handle_admin_view(call):
     if call.message.chat.id != ADMIN_ID:
         return
@@ -253,16 +255,89 @@ def handle_admin_view(call):
     if call.data == "show_active":
         cursor.execute("SELECT user_id, username FROM access_requests WHERE status = 'approved'")
         rows = cursor.fetchall()
-        text = "📍 Активные:\n" + "\n".join([f"🔹 ID: {r[0]} | @{r[1]}" for r in rows]) if rows else "🙁 Нет активных."
-        bot.send_message(call.message.chat.id, text)
+        if not rows:
+            bot.send_message(call.message.chat.id, "🙁 Нет активных пользователей.")
+            return
+        for r in rows:
+            uid, uname = r
+            markup = types.InlineKeyboardMarkup()
+            markup.add(
+                types.InlineKeyboardButton("❌ Забрать доступ", callback_data=f"revoke_{uid}")
+            )
+            bot.send_message(call.message.chat.id, f"🔹 ID: {uid} | @{uname}", reply_markup=markup)
 
     elif call.data == "show_pending":
         cursor.execute("SELECT user_id, username FROM access_requests WHERE status = 'pending'")
         rows = cursor.fetchall()
-        text = "⏳ В ожидании:\n" + "\n".join([f"🔸 ID: {r[0]} | @{r[1]}" for r in rows]) if rows else "🙁 Нет заявок."
-        bot.send_message(call.message.chat.id, text)
+        if not rows:
+            bot.send_message(call.message.chat.id, "🙁 Нет ожидающих заявок.")
+            return
+        for r in rows:
+            uid, uname = r
+            markup = types.InlineKeyboardMarkup()
+            markup.add(
+                types.InlineKeyboardButton("✅ Вернуть доступ", callback_data=f"return_{uid}")
+            )
+            bot.send_message(call.message.chat.id, f"🔸 ID: {uid} | @{uname}", reply_markup=markup)
 
-# 🔁 Автовосстановление polling + уведомление админу
+    elif call.data == "show_stats":
+        cursor.execute("SELECT COUNT(*) FROM access_requests")
+        total = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM access_requests WHERE status = 'approved'")
+        approved = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM access_requests WHERE status = 'pending'")
+        pending = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM access_requests WHERE status = 'denied'")
+        denied = cursor.fetchone()[0]
+
+        cursor.execute("SELECT lang_code FROM access_requests")
+        rows = cursor.fetchall()
+        lang_stats = {}
+        for r in rows:
+            lang = r[0]
+            if lang:
+                lang_stats[lang] = lang_stats.get(lang, 0) + 1
+
+        text = f"""📊 Статистика:
+
+👥 Всего лидов: {total}
+✅ Одобрено: {approved}
+⏳ В ожидании: {pending}
+❌ Отклонено: {denied}
+
+🌍 Языки Telegram:"""
+        for lang, count in lang_stats.items():
+            text += f"\n🔤 {lang}: {count}"
+
+        bot.send_message(call.message.chat.id, text)
+# ✅ / ❌ Управление доступом
+@bot.callback_query_handler(func=lambda call: call.data.startswith("return_") or call.data.startswith("revoke_"))
+def handle_access_update(call):
+    if call.message.chat.id != ADMIN_ID:
+        return
+
+    action, uid = call.data.split("_")
+    uid = int(uid)
+
+    cursor = conn.cursor()
+    cursor.execute("SELECT username FROM access_requests WHERE user_id = ?", (uid,))
+    user = cursor.fetchone()
+    uname = user[0] if user else "—"
+
+    if action == "return":
+        cursor.execute("UPDATE access_requests SET status = 'approved' WHERE user_id = ?", (uid,))
+        conn.commit()
+        bot.send_message(uid, "✅ Ваш доступ был восстановлен!")
+        bot.send_message(call.message.chat.id, f"✅ Доступ возвращён для @{uname}")
+        show_language_menu(uid)
+
+    elif action == "revoke":
+        cursor.execute("UPDATE access_requests SET status = 'denied' WHERE user_id = ?", (uid,))
+        conn.commit()
+        bot.send_message(uid, "❌ Ваш доступ был отозван.")
+        bot.send_message(call.message.chat.id, f"❌ Доступ отозван у @{uname}")
+
+# 🔁 Защита polling + уведомление админу
 def start_bot():
     while True:
         try:
@@ -277,5 +352,5 @@ def start_bot():
                 pass
             time.sleep(10)
 
-# 🟢 Финальный старт
+# 🟢 Старт
 start_bot()
