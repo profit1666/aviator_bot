@@ -11,7 +11,7 @@ from datetime import datetime
 app = Flask('')
 @app.route('/')
 def home():
-    return "Bot is alive!"
+    return "Bot is running!"
 def run():
     app.run(host='0.0.0.0', port=8080)
 def keep_alive():
@@ -19,7 +19,7 @@ def keep_alive():
 
 keep_alive()
 
-# 🔑 Настройки
+# 🔑 Конфигурация Telegram
 TOKEN = "7856074080:AAGPBNStc9JixmgxaILGsPBxm2n3M88hhwU"
 ADMIN_ID = 1463957271
 bot = telebot.TeleBot(TOKEN)
@@ -42,7 +42,7 @@ with conn:
 def generate_signal():
     return round(random.uniform(1.2, 15.0), 2)
 
-# 🚀 /start → заявка владельцу
+# 🚀 Старт бота — /start
 @bot.message_handler(commands=['start'])
 def start(message):
     user_id = message.chat.id
@@ -66,23 +66,23 @@ def start(message):
         types.InlineKeyboardButton("❌ Отклонить", callback_data=f"deny_{user_id}")
     )
 
-    bot.send_message(ADMIN_ID, f"🔔 Новый лид запрашивает доступ.\nID: <code>{user_id}</code>", parse_mode="HTML", reply_markup=markup)
+    bot.send_message(ADMIN_ID, f"🔔 Новый пользователь запросил доступ\nID: <code>{user_id}</code>", parse_mode="HTML", reply_markup=markup)
     bot.send_message(user_id, "🔒 Запрос на доступ отправлен. Ожидайте подтверждения.")
 
-# 🌐 Меню выбора языка
+# 🌍 Меню выбора языка
 def show_language_menu(chat_id):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
     markup.add(types.KeyboardButton("🇬🇧 English"), types.KeyboardButton("🇮🇳 हिंदी"))
-    bot.send_message(chat_id, "Please choose your language:\nकृपया अपनी भाषा चुनें:", reply_markup=markup)
+    bot.send_message(chat_id, "Пожалуйста, выберите язык:", reply_markup=markup)
 
-# 📬 Обработка подтверждения доступа
+# ✅ Подтверждение или отклонение доступа
 @bot.callback_query_handler(func=lambda call: call.data.startswith("approve_") or call.data.startswith("deny_"))
 def handle_access_decision(call):
     action, user_id = call.data.split("_")
     user_id = int(user_id)
 
     if call.message.chat.id != ADMIN_ID:
-        bot.answer_callback_query(call.id, "🚫 Недостаточно прав.")
+        bot.answer_callback_query(call.id, "🚫 Только админ может управлять доступом.")
         return
 
     with conn:
@@ -91,13 +91,13 @@ def handle_access_decision(call):
         cursor.execute("UPDATE access_requests SET status = ? WHERE user_id = ?", (status, user_id))
 
     if status == "approved":
-        bot.send_message(user_id, "✅ Доступ подтверждён! Продолжаем 👇")
+        bot.send_message(user_id, "✅ Доступ подтверждён! Продолжайте 👇")
         show_language_menu(user_id)
     else:
-        bot.send_message(user_id, "❌ Доступ отклонён.")
+        bot.send_message(user_id, "❌ Доступ к боту отклонён.")
     bot.send_message(call.message.chat.id, f"📬 Статус пользователя обновлён: {status}")
 
-# 🌐 Установка языка и выдача сигнала
+# 🌐 Установка языка
 @bot.message_handler(func=lambda m: m.text in ["🇬🇧 English", "🇮🇳 हिंदी"])
 def set_language(message):
     user_id = message.chat.id
@@ -117,25 +117,25 @@ def set_language(message):
     with conn:
         conn.execute("INSERT OR REPLACE INTO leads (user_id, language, timestamp) VALUES (?, ?, ?)", (user_id, lang, timestamp))
 
-    bot.send_message(user_id, "📊 " + ("Analyzing last 5 Aviator rounds..." if lang == "en" else "Aviator के पिछले 5 राउंड का विश्लेषण..."))
+    bot.send_message(user_id, "📊 Анализ последних 5 раундов Aviator..." if lang == "en" else "📊 Aviator के पिछले 5 राउंड का विश्लेषण...")
     time.sleep(1.5)
-    bot.send_message(user_id, "⏳ " + ("Running probabilistic forecast..." if lang == "en" else "संभावना विश्लेषण चल रहा है..."))
+    bot.send_message(user_id, "⏳ Запуск вероятностного прогноза..." if lang == "en" else "⏳ संभावना विश्लेषण चल रहा है...")
     time.sleep(2)
 
     result = generate_signal()
-    message_out = f"""🎯 <b>{'Your most probable signal:' if lang == 'en' else 'सबसे संभावित सिग्नल:'}</b> <code>{result}x</code>
-🧠 {'Confidence' if lang == 'en' else 'विश्वास स्तर'}: 99.9%"""
-    bot.send_message(user_id, message_out, parse_mode="HTML")
+    msg = f"""🎯 <b>{'Ваш самый вероятный сигнал:' if lang == 'en' else 'सबसे संभावित सिग्नल:'}</b> <code>{result}x</code>
+🧠 {'Уверенность' if lang == 'en' else 'विश्वास स्तर'}: 99.9%"""
+    bot.send_message(user_id, msg, parse_mode="HTML")
     show_main_menu(user_id, lang)
 
 # 📱 Главное меню
 def show_main_menu(chat_id, lang):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add(types.KeyboardButton("🎯 Get Signal" if lang == "en" else "🎯 सिग्नल प्राप्त करें"))
-    markup.add(types.KeyboardButton("🔄 Change Language" if lang == "en" else "🔄 भाषा बदलें"))
-    bot.send_message(chat_id, "Choose an option:" if lang == "en" else "एक विकल्प चुनें:", reply_markup=markup)
+    markup.add(types.KeyboardButton("🎯 Получить сигнал" if lang == "en" else "🎯 सिग्नल प्राप्त करें"))
+    markup.add(types.KeyboardButton("🔄 Сменить язык" if lang == "en" else "🔄 भाषा बदलें"))
+    bot.send_message(chat_id, "Выберите опцию:" if lang == "en" else "कोई विकल्प चुनें:", reply_markup=markup)
 
-# 🎛 Кнопки
+# 🔘 Обработка кнопок
 @bot.message_handler(func=lambda m: True)
 def handle_buttons(message):
     user_id = message.chat.id
@@ -145,23 +145,23 @@ def handle_buttons(message):
         row = cursor.fetchone()
 
     if not row or row[0] != "approved":
-        bot.send_message(user_id, "🚫 Доступ к боту не разрешён.")
+        bot.send_message(user_id, "🚫 У вас нет доступа к боту.")
         return
 
     lang = user_language.get(user_id, "en")
     text = message.text
 
-    if text in ["🎯 Get Signal", "🎯 सिग्नल प्राप्त करें"]:
-        bot.send_message(user_id, "📊 " + ("Analyzing Aviator history..." if lang == "en" else "Aviator इतिहास का विश्लेषण..."))
+    if text in ["🎯 Получить сигнал", "🎯 सिग्नल प्राप्त करें"]:
+        bot.send_message(user_id, "📊 Анализ истории Aviator..." if lang == "en" else "📊 Aviator इतिहास का विश्लेषण...")
         time.sleep(1.2)
-        bot.send_message(user_id, "⏳ " + ("Calculating next best move..." if lang == "en" else "अगला सटीक सिग्नल खोजा जा रहा है..."))
+        bot.send_message(user_id, "⏳ Поиск лучшего сигнала..." if lang == "en" else "⏳ अगला सटीक सिग्नल खोजा जा रहा है...")
         time.sleep(2)
         result = generate_signal()
-        msg = f"""🎯 <b>{'Your most probable signal:' if lang == 'en' else 'सबसे संभावित सिग्नल:'}</b> <code>{result}x</code>
-🧠 {'Confidence' if lang == 'en' else 'विश्वास स्तर'}: 99.9%"""
+        msg = f"""🎯 <b>{'Сигнал:' if lang == 'en' else 'सिग्नल:'}</b> <code>{result}x</code>
+🧠 {'Уверенность' if lang == 'en' else 'विश्वास स्तर'}: 99.9%"""
         bot.send_message(user_id, msg, parse_mode="HTML")
 
-    elif text in ["🔄 Change Language", "🔄 भाषा बदलें"]:
+    elif text in ["🔄 Сменить язык", "🔄 भाषा बदलें"]:
         show_language_menu(user_id)
     elif text == "/admin":
         show_admin_panel(message)
@@ -169,7 +169,7 @@ def handle_buttons(message):
 # 🛡 Панель администратора
 def show_admin_panel(message):
     if message.chat.id != ADMIN_ID:
-        bot.send_message(message.chat.id, "🚫 Нет доступа.")
+        bot.send_message(message.chat.id, "🚫 У вас нет прав администратора.")
         return
 
     with conn:
@@ -192,4 +192,5 @@ def show_admin_panel(message):
                          parse_mode="HTML", reply_markup=markup if status == "pending" else None)
 
 # 🔁 Запуск бота
-print("🚀
+print("🚀 Бот запущен!")
+bot.polling(none_stop=True)
