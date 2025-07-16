@@ -10,6 +10,27 @@ from datetime import datetime
 # 🌐 Flask для Render
 app = Flask('')
 @app.route('/')
+from flask import request
+
+@app.route('/postback', methods=['GET', 'POST'])
+def handle_postback():
+    data = request.args if request.method == 'GET' else request.form
+    sub_id = data.get('sub_id')   # Кто зарегистрировался (ID)
+    event = data.get('type')      # Что произошло (регистрация, депозит и т.д.)
+    amount = data.get('amount', '—')  # Сколько пополнил — если передаётся
+
+    if not sub_id or not event:
+        return "❌ Нет данных", 400
+
+    message = f"""📨 Постбек от 1win:\n
+👤 Лид: <code>{sub_id}</code>\n
+🎬 Событие: <b>{event.upper()}</b>\n
+💰 Сумма: {amount}"""
+
+    # Отправка тебе в Telegram
+    bot.send_message(ADMIN_ID, message, parse_mode="HTML")
+    return "OK", 200
+
 def home():
     return "Bot is running!"
 
