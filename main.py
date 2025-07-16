@@ -3,8 +3,8 @@ from threading import Thread
 import telebot
 from telebot import types
 import sqlite3
-import random
 import time
+import random
 from datetime import datetime
 
 # 🌐 Flask для Render
@@ -25,8 +25,8 @@ keep_alive()
 TOKEN = "7856074080:AAGPBNStc9JixmgxaILGsPBxm2n3M88hhwU"
 ADMIN_ID = 1463957271
 bot = telebot.TeleBot(TOKEN)
-user_language = {}
-user_language[ADMIN_ID] = "ru"
+user_language = {ADMIN_ID: "ru"}
+
 # 📦 База данных SQLite
 conn = sqlite3.connect('leads.db', check_same_thread=False)
 with conn:
@@ -43,10 +43,10 @@ with conn:
         user_id INTEGER,
         timestamp TEXT
     )''')
-
 # 🎯 Генератор сигнала Aviator
 def generate_signal():
     return round(random.uniform(1.2, 15.0), 2)
+
 # 🚀 Обработка /start
 @bot.message_handler(commands=['start'])
 def start(message):
@@ -88,7 +88,6 @@ def start(message):
 
     bot.send_message(ADMIN_ID, info, parse_mode="HTML", reply_markup=markup)
     bot.send_message(user_id, "🔒 Ваша заявка отправлена. Ожидайте подтверждения.")
-
 # ✅ Обработка решения админа
 @bot.callback_query_handler(func=lambda call: call.data.startswith("approve_") or call.data.startswith("deny_"))
 def handle_access_decision(call):
@@ -129,6 +128,7 @@ def show_language_menu(chat_id):
         types.KeyboardButton("🇮🇳 हिंदी")
     )
     bot.send_message(chat_id, "Please choose a language:", reply_markup=markup)
+
 # 🌍 Обработка выбранного языка
 @bot.message_handler(func=lambda m: m.text in ["🇬🇧 English", "🇮🇳 हिंदी"])
 def set_language(message):
@@ -174,7 +174,6 @@ def show_main_menu(chat_id, lang):
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add(types.KeyboardButton(signal_btn), types.KeyboardButton(lang_btn))
     bot.send_message(chat_id, prompt, reply_markup=markup)
-
 # 🔘 Обработка кнопок меню
 @bot.message_handler(func=lambda m: True)
 def handle_buttons(message):
@@ -241,10 +240,79 @@ def show_admin_panel(chat_id):
     markup.add(
         types.InlineKeyboardButton("📍 Активные", callback_data="show_active"),
         types.InlineKeyboardButton("⏳ Ожидающие", callback_data="show_pending"),
-        types.InlineKeyboardButton("📊 Статистика", callback_data="show_stats")
+        types.InlineKeyboardButton("📊 Статистика", callback_data="show_stats"),
+        types.InlineKeyboardButton("❌ Отозвать заявку", callback_data="manual_deny"),
+        types.InlineKeyboardButton("➕ Добавить лида", callback_data="manual_add"),
+        types.InlineKeyboardButton("✅ Массово одобрить", callback_data="bulk_approve"),
+        types.InlineKeyboardButton("❌ Массово отклонить", callback_data="bulk_deny")
     )
     bot.send_message(chat_id, "🎛 Панель управления:", reply_markup=markup)
 
+# 🆔 Ручное отклонение заявки
+@bot.callback_query_handler(func=lambda call: call.data == "manual_deny")
+def manual_deny_handler(call):
+    bot.send_message(ADMIN_ID, "📥 Введите ID или username пользователя для отказа:")
+    bot.register_next_step_handler(call.message, process_manual_deny)
+
+def process_manual_deny(message):
+    input_text = message.text.strip()
+    cursor = conn.cursor()
+    if input_text.isdigit():
+        cursor.execute("UPDATE access_requests SET status = 'denied' WHERE user_id = ?", (int(input_text),))
+    else:
+        cursor.execute("UPDATE access_requests SET status = 'denied' WHERE username = ?", (input_text.lstrip("@"),))
+    conn.commit()
+    bot.send_message(ADMIN_ID, f"❌ Доступ отозван для: {input_text}")
+
+# 🆕 Ручное добавление лида
+@bot.callback_query_handler(func=lambda call: call.data == "manual_add")
+def manual_add_handler(call):
+    bot.send_message(ADMIN_ID, "📥 Введите ID или username нового лида:")
+    bot.register_next_step_handler(call.message, process_manual_add)
+
+def process_manual_add(message):
+    input_text = message.text.strip()
+    cursor = conn.cursor()
+    user_id = int(input_text) if input_text.isdigit() else None
+    username = input_text.lstrip("@") if not input_text.isdigit() else "—"
+    cursor.execute('''INSERT OR REPLACE INTO access_requests 
+        (user_id, status, username, first_name, last_name, lang_code, permanent) 
+        VALUES (?, ?, ?, ?, ?, ?, ?)''',
+        (user_id if user_id else 0, "approved", username, "—", "—", "—", 1)
+    )
+    conn.commit()
+    bot.send_message(ADMIN_ID, f"✅ Лид добавлен вручную: {input_text}")
+# 📦 Массовое одобрение / отклонение
+@bot.callback_query_handler(func=lambda call: call.data in ["bulk_approve", "bulk_deny"])
+def handle_bulk_action(call):
+    action = "одобрить" if call.data == "bulk_approve" else "отклонить"
+    bot.send_message(call.message.chat.id, f"📥 Введите ID или username через запятую для {action}:")
+    next = process_bulk_approve if action == "одобрить" else process_bulk_deny
+    bot.register_next_step_handler(call.message, next)
+
+def process_bulk_approve(message):
+    ids = [i.strip().lstrip("@") for i in message.text.split(",")]
+    cursor = conn.cursor()
+    for i in ids:
+        if i.isdigit():
+            cursor.execute("UPDATE access_requests SET status = 'approved' WHERE user_id = ?", (int(i),))
+        else:
+            cursor.execute("UPDATE access_requests SET status = 'approved' WHERE username = ?", (i,))
+    conn.commit()
+    bot.send_message(message.chat.id, "✅ Лиды одобрены.")
+
+def process_bulk_deny(message):
+    ids = [i.strip().lstrip("@") for i in message.text.split(",")]
+    cursor = conn.cursor()
+    for i in ids:
+        if i.isdigit():
+            cursor.execute("UPDATE access_requests SET status = 'denied' WHERE user_id = ?", (int(i),))
+        else:
+            cursor.execute("UPDATE access_requests SET status = 'denied' WHERE username = ?", (i,))
+    conn.commit()
+    bot.send_message(message.chat.id, "❌ Доступ отклонён.")
+
+# 📍 Просмотр активных / ожидающих / статистики
 @bot.callback_query_handler(func=lambda call: call.data.startswith("show_"))
 def handle_admin_view(call):
     if call.message.chat.id != ADMIN_ID:
@@ -261,9 +329,7 @@ def handle_admin_view(call):
         for r in rows:
             uid, uname = r
             markup = types.InlineKeyboardMarkup()
-            markup.add(
-                types.InlineKeyboardButton("❌ Забрать доступ", callback_data=f"revoke_{uid}")
-            )
+            markup.add(types.InlineKeyboardButton("❌ Забрать доступ", callback_data=f"revoke_{uid}"))
             bot.send_message(call.message.chat.id, f"🔹 ID: {uid} | @{uname}", reply_markup=markup)
 
     elif call.data == "show_pending":
@@ -275,9 +341,7 @@ def handle_admin_view(call):
         for r in rows:
             uid, uname = r
             markup = types.InlineKeyboardMarkup()
-            markup.add(
-                types.InlineKeyboardButton("✅ Вернуть доступ", callback_data=f"return_{uid}")
-            )
+            markup.add(types.InlineKeyboardButton("✅ Вернуть доступ", callback_data=f"return_{uid}"))
             bot.send_message(call.message.chat.id, f"🔸 ID: {uid} | @{uname}", reply_markup=markup)
 
     elif call.data == "show_stats":
@@ -310,7 +374,8 @@ def handle_admin_view(call):
             text += f"\n🔤 {lang}: {count}"
 
         bot.send_message(call.message.chat.id, text)
-# ✅ / ❌ Управление доступом
+
+# ✅ / ❌ Управление доступом вручную
 @bot.callback_query_handler(func=lambda call: call.data.startswith("return_") or call.data.startswith("revoke_"))
 def handle_access_update(call):
     if call.message.chat.id != ADMIN_ID:
