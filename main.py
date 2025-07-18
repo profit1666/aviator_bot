@@ -18,7 +18,7 @@ def home():
 def handle_postback():
     data = request.args if request.method == 'GET' else request.form
 
-    sub_id = data.get('subid')             # Telegram ID лида
+    sub_id = data.get('subid101')             # Telegram ID лида
     event = data.get('event')              # Тип события
     amount = data.get('sum', '—')          # Сумма депозита
     status = data.get('status', '—')       # Статус, например "ok"
