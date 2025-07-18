@@ -17,6 +17,31 @@ def home():
 @app.route('/postback', methods=['GET', 'POST'])
 def handle_postback():
     data = request.args if request.method == 'GET' else request.form
+
+    sub_id = data.get('subid')             # Telegram ID лида
+    event = data.get('event')              # Тип события
+    amount = data.get('sum', '—')          # Сумма депозита
+    status = data.get('status', '—')       # Статус, например "ok"
+    timestamp = datetime.utcnow().isoformat()
+
+    if not sub_id or not event:
+        return "❌ Не хватает данных", 400
+
+    message = f"""📨 Событие от 1win:
+👤 Лид: <code>{sub_id}</code>
+🎬 Событие: <b>{event.upper()}</b>
+💰 Сумма: {amount}
+📋 Статус: {status}
+🕒 Время: {timestamp}"""
+
+    try:
+        bot.send_message(ADMIN_ID, message, parse_mode="HTML")
+    except Exception as e:
+        print(f"Ошибка при отправке уведомления: {e}")
+
+    return "OK", 200
+
+    data = request.args if request.method == 'GET' else request.form
     sub_id = data.get('sub1')        # Telegram ID лида
     event = data.get('type')         # Событие: registration, deposit
     amount = data.get('amount', '—') # Сумма, если есть
