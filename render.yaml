@@ -6,8 +6,9 @@ services:
     buildCommand: ""
     startCommand: python bot.py
     region: frankfurt
+    runtimeVersion: 3.11
     envVars:
       - key: TG_BOT_TOKEN
-        value: твой_телеграм_токен
+        value: твой_токен_бота
       - key: OPENAI_API_KEY
         value: твой_openai_ключ
