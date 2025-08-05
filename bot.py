@@ -7,7 +7,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# 🔐 Чтение ключей из .env или переменных окружения на Render
 API_TOKEN = os.getenv("TG_BOT_TOKEN")
 OPENAI_KEY = os.getenv("OPENAI_API_KEY")
 CHANNEL_ID = "@One_win_Aviator_Profit"
@@ -18,7 +17,6 @@ logging.basicConfig(level=logging.INFO)
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(bot)
 
-# 🎯 Генерация поста на хинди (латиницей) в стиле Aviator
 async def generate_hindi_post():
     prompt = (
         "Generate a short Telegram post in Hindi (Latin script) for Aviator betting channel. "
@@ -31,7 +29,6 @@ async def generate_hindi_post():
     )
     return response["choices"][0]["message"]["content"].strip()
 
-# 📲 Админ-панель с кнопкой мгновенного поста
 @dp.message_handler(commands=["panel"])
 async def admin_panel(message: types.Message):
     if message.from_user.id not in ADMIN_IDS:
@@ -49,14 +46,12 @@ async def post_now(callback_query: types.CallbackQuery):
     await bot.send_message(CHANNEL_ID, post)
     await bot.answer_callback_query(callback_query.id, text="✅ Пост опубликован")
 
-# 🔁 Автопостинг каждые 30 минут
 async def periodic_posting():
     while True:
         post = await generate_hindi_post()
         await bot.send_message(CHANNEL_ID, post)
         await asyncio.sleep(1800)
 
-# 🚀 Запуск
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     loop.create_task(periodic_posting())
