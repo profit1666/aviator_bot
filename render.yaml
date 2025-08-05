@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: aviator-bot
+    env: python
+    plan: starter
+    buildCommand: ""
+    startCommand: python bot.py
+    region: frankfurt
+    envVars:
+      - key: TG_BOT_TOKEN
+        value: твой_телеграм_токен
+      - key: OPENAI_API_KEY
+        value: твой_openai_ключ
